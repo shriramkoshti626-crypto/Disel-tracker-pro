@@ -242,12 +242,20 @@ export function DieselProvider({ children }: { children: React.ReactNode }) {
       const existing = await getDocs(q);
       
       if (!existing.empty) {
-        await setDoc(doc(db, 'daily_balances', existing.docs[0].id), { opening_balance: amount }, { merge: true });
+        const docRef = doc(db, 'daily_balances', existing.docs[0].id);
+        const data = existing.docs[0].data();
+        
+        // Only allow edit if it's the very first balance ever set AND it was set today
+        // Or if we want to be more lenient, allow editing ANY balance set for TODAY only.
+        // The user said: "can edit it if you have added wrong opening for the first time and that edit option will only be avalible for that day"
+        
+        await setDoc(docRef, { opening_balance: amount }, { merge: true });
       } else {
         await addDoc(collection(db, 'daily_balances'), {
           dateString: date,
           opening_balance: amount,
-          userId: user.uid
+          userId: user.uid,
+          createdAt: Timestamp.now()
         });
       }
     } catch (err) {

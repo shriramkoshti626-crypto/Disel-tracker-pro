@@ -12,9 +12,12 @@ export function Dashboard() {
   const [showConsumption, setShowConsumption] = useState(false);
   const [showIssue, setShowIssue] = useState(false);
   const [showSetOpening, setShowSetOpening] = useState(false);
+  const [showAllActivity, setShowAllActivity] = useState(false);
 
   const today = format(new Date(), 'yyyy-MM-dd');
   const hasOpeningBalance = dailyBalances.some(b => b.dateString === today);
+  const isInitialSetup = dailyBalances.length === 0;
+  const isFirstDayOfRecords = dailyBalances.length === 1 && dailyBalances[0].dateString === today;
 
   const getBalanceColor = (balance: number) => {
     if (balance > 1000) return 'text-green-600 bg-green-50 border-green-200';
@@ -22,10 +25,20 @@ export function Dashboard() {
     return 'text-red-600 bg-red-50 border-red-200';
   };
 
-  const recentActivity = [
+  const allActivities = [
     ...entries.map(e => ({ ...e, typeLabel: e.type === EntryType.INWARD ? 'Inward' : 'Consumption', date: e.timestamp.toDate() })),
-    ...tmLogs.map(l => ({ ...l, typeLabel: 'TM Issue', liters: l.liters_given, date: l.timestamp.toDate(), note: `Vehicle: ${l.vehicleNumber}` }))
-  ].sort((a, b) => b.date - a.date).slice(0, 10);
+    ...tmLogs.map(l => ({ ...l, typeLabel: 'TM Issue', liters: l.liters_given, date: l.timestamp.toDate(), note: `Vehicle: ${l.vehicleNumber}` })),
+    ...dailyBalances.map(b => ({
+      ...b,
+      typeLabel: 'Opening Balance',
+      liters: b.opening_balance,
+      date: (b as any).createdAt?.toDate() || new Date(b.dateString),
+      note: 'Initial tank setup',
+      type: 'setup' as any
+    }))
+  ].sort((a, b) => b.date.getTime() - a.date.getTime());
+
+  const recentActivity = showAllActivity ? allActivities : allActivities.slice(0, 6);
 
   const latestConsumption = [...entries.filter(e => e.type === EntryType.CONSUMPTION), ...tmLogs]
     .sort((a,b) => b.timestamp.toMillis() - a.timestamp.toMillis())[0];
@@ -67,18 +80,26 @@ export function Dashboard() {
           <div className="flex items-baseline gap-2">
             <span className="text-6xl font-black tracking-tighter text-zinc-900">{formatNumber(currentBalance, 0)}</span>
             <span className="text-xl font-bold text-zinc-900/60">Liters</span>
+            {isFirstDayOfRecords && (
+              <button 
+                onClick={() => setShowSetOpening(true)}
+                className="ml-4 rounded-lg bg-zinc-900/5 px-2 py-1 text-[10px] font-bold uppercase text-zinc-900/40 hover:bg-zinc-900/10 transition-colors"
+              >
+                Edit Opening
+              </button>
+            )}
           </div>
         </div>
         
-        {!hasOpeningBalance && (
+        {isInitialSetup && (
           <div className="mt-6 flex items-center gap-3 rounded-2xl bg-white/60 p-4 backdrop-blur-sm border border-white/40">
             <AlertCircle size={20} className="text-orange-600 shrink-0" />
-            <p className="text-xs font-medium text-zinc-900">Opening balance for today is not set.</p>
+            <p className="text-xs font-medium text-zinc-900">Set your initial tank balance to start tracking.</p>
             <button 
               onClick={() => setShowSetOpening(true)}
               className="ml-auto rounded-lg bg-orange-600 px-3 py-1.5 text-xs font-bold text-white shadow-sm"
             >
-              Set Now
+              Set Opening
             </button>
           </div>
         )}
@@ -132,10 +153,12 @@ export function Dashboard() {
                 <div className={cn(
                   "rounded-xl p-2.5",
                   activity.type === EntryType.INWARD ? "bg-green-100 text-green-600" : 
-                  activity.type === EntryType.CONSUMPTION ? "bg-red-100 text-red-600" : "bg-orange-100 text-orange-600"
+                  activity.type === EntryType.CONSUMPTION ? "bg-red-100 text-red-600" : 
+                  activity.type === 'setup' ? "bg-zinc-100 text-zinc-600" : "bg-orange-100 text-orange-600"
                 )}>
                   {activity.type === EntryType.INWARD ? <Plus size={18} /> : 
-                   activity.type === EntryType.CONSUMPTION ? <Minus size={18} /> : <Truck size={18} />}
+                   activity.type === EntryType.CONSUMPTION ? <Minus size={18} /> : 
+                   activity.type === 'setup' ? <Truck size={18} /> : <Truck size={18} />}
                 </div>
                 <div className="flex-1">
                   <p className="text-sm font-bold">{activity.typeLabel}</p>
@@ -144,14 +167,31 @@ export function Dashboard() {
                 <div className="text-right">
                   <p className={cn(
                     "text-sm font-black",
-                    activity.type === EntryType.INWARD ? "text-green-600" : "text-zinc-900"
+                    activity.type === EntryType.INWARD || activity.type === 'setup' ? "text-green-600" : "text-zinc-900"
                   )}>
-                    {activity.type === EntryType.INWARD ? '+' : '-'}{activity.liters} L
+                    {activity.type === EntryType.INWARD || activity.type === 'setup' ? '+' : '-'}{activity.liters} L
                   </p>
                   {activity.note && <p className="text-[10px] text-zinc-400 truncate max-w-[100px]">{activity.note}</p>}
                 </div>
               </div>
             ))
+          )}
+
+          {!showAllActivity && allActivities.length > 6 && (
+            <button 
+              onClick={() => setShowAllActivity(true)}
+              className="w-full rounded-xl py-3 text-xs font-bold text-zinc-400 hover:bg-zinc-50 hover:text-zinc-600 transition-colors border border-dashed border-zinc-100"
+            >
+              Show More Activities
+            </button>
+          )}
+          {showAllActivity && allActivities.length > 6 && (
+            <button 
+              onClick={() => setShowAllActivity(false)}
+              className="w-full rounded-xl py-3 text-xs font-bold text-zinc-400 hover:bg-zinc-50 hover:text-zinc-600 transition-colors"
+            >
+              Show Less
+            </button>
           )}
         </div>
       </section>
@@ -182,6 +222,7 @@ export function Dashboard() {
       {showSetOpening && (
         <OpeningBalanceModal 
           date={today}
+          initialValue={dailyBalances.length > 0 ? dailyBalances[0].opening_balance : undefined}
           onClose={() => setShowSetOpening(false)}
           onSubmit={setOpeningBalance}
         />
@@ -425,8 +466,8 @@ function IssueModal({ onClose, onSubmit, vehicles, tmLogs }: { onClose: () => vo
   );
 }
 
-function OpeningBalanceModal({ date, onClose, onSubmit }: { date: string, onClose: () => void, onSubmit: (date: string, amount: number) => Promise<void> }) {
-  const [balance, setBalance] = useState('');
+function OpeningBalanceModal({ date, initialValue, onClose, onSubmit }: { date: string, initialValue?: number, onClose: () => void, onSubmit: (date: string, amount: number) => Promise<void> }) {
+  const [balance, setBalance] = useState(initialValue?.toString() || '');
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
