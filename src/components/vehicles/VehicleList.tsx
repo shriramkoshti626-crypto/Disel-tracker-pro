@@ -1,18 +1,27 @@
 import React, { useState } from 'react';
 import { useDiesel } from '../../context/DieselContext';
-import { Plus, Edit2, Trash2, Search, Truck, Zap } from 'lucide-react';
+import { Plus, Edit2, Trash2, Search, Truck, Zap, AlertTriangle } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Vehicle } from '../../types';
+import { cn } from '../../lib/utils';
 
 export function VehicleList() {
   const { vehicles, addVehicle, updateVehicle, deleteVehicle } = useDiesel();
   const [searchTerm, setSearchTerm] = useState('');
   const [editingVehicle, setEditingVehicle] = useState<Vehicle | null>(null);
   const [showAddForm, setShowAddForm] = useState(false);
+  const [vehicleToDelete, setVehicleToDelete] = useState<Vehicle | null>(null);
 
   const filteredVehicles = vehicles.filter(v => 
     v.vehicle_number.toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  const handleDelete = async () => {
+    if (vehicleToDelete?.id) {
+      await deleteVehicle(vehicleToDelete.id);
+      setVehicleToDelete(null);
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -62,18 +71,16 @@ export function VehicleList() {
                   <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-orange-100 text-orange-600">
                     <Truck size={24} />
                   </div>
-                  <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <div className="flex gap-1 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
                     <button 
                       onClick={() => setEditingVehicle(vehicle)}
-                      className="rounded-lg p-2 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-900"
+                      className="rounded-lg p-2 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-900 focus:text-zinc-900"
                     >
                       <Edit2 size={16} />
                     </button>
                     <button 
-                      onClick={() => {
-                        if (confirm('Delete this vehicle?')) deleteVehicle(vehicle.id!);
-                      }}
-                      className="rounded-lg p-2 text-zinc-400 hover:bg-zinc-100 hover:text-red-500"
+                      onClick={() => setVehicleToDelete(vehicle)}
+                      className="rounded-lg p-2 text-zinc-400 hover:bg-zinc-100 hover:text-red-500 focus:text-red-500"
                     >
                       <Trash2 size={16} />
                     </button>
@@ -99,6 +106,7 @@ export function VehicleList() {
       {(showAddForm || editingVehicle) && (
         <VehicleFormModal 
           vehicle={editingVehicle || undefined}
+          existingVehicles={vehicles}
           onClose={() => {
             setShowAddForm(false);
             setEditingVehicle(null);
@@ -112,27 +120,86 @@ export function VehicleList() {
           }}
         />
       )}
+
+      {/* Delete Confirmation Modal */}
+      {vehicleToDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
+          <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="w-full max-w-sm rounded-3xl bg-white p-6 shadow-2xl text-center">
+            <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-red-100 text-red-600">
+              <AlertTriangle size={32} />
+            </div>
+            <h3 className="text-xl font-bold text-zinc-900">Delete Vehicle?</h3>
+            <p className="mt-2 text-sm text-zinc-500">
+              Are you sure you want to delete <span className="font-bold text-zinc-900">{vehicleToDelete.vehicle_number}</span>? This action cannot be undone.
+            </p>
+            <div className="mt-6 flex gap-3">
+              <button 
+                onClick={() => setVehicleToDelete(null)}
+                className="flex-1 rounded-xl bg-zinc-100 py-3 font-bold text-zinc-500"
+              >
+                Cancel
+              </button>
+              <button 
+                onClick={handleDelete}
+                className="flex-1 rounded-xl bg-red-600 py-3 font-bold text-white shadow-lg shadow-red-100"
+              >
+                Delete
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
     </div>
   );
 }
 
-function VehicleFormModal({ vehicle, onClose, onSubmit }: { vehicle?: Vehicle, onClose: () => void, onSubmit: (d: any) => Promise<void> }) {
+function VehicleFormModal({ 
+  vehicle, 
+  existingVehicles, 
+  onClose, 
+  onSubmit 
+}: { 
+  vehicle?: Vehicle, 
+  existingVehicles: Vehicle[],
+  onClose: () => void, 
+  onSubmit: (d: any) => Promise<void> 
+}) {
   const [number, setNumber] = useState(vehicle?.vehicle_number || '');
   const [mileage, setMileage] = useState(vehicle?.mileage_kmpl?.toString() || '');
   const [note, setNote] = useState(vehicle?.note || '');
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setError(null);
     if (!number || !mileage) return;
+
+    const upperNumber = number.toUpperCase().trim();
+    
+    // Duplicate check
+    const isDuplicate = existingVehicles.some(v => 
+      v.vehicle_number.toUpperCase() === upperNumber && v.id !== vehicle?.id
+    );
+
+    if (isDuplicate) {
+      setError(`Vehicle ${upperNumber} is already registered!`);
+      return;
+    }
+
     setLoading(true);
-    await onSubmit({ 
-      vehicle_number: number.toUpperCase(), 
-      mileage_kmpl: Number(mileage), 
-      note 
-    });
-    setLoading(false);
-    onClose();
+    try {
+      await onSubmit({ 
+        vehicle_number: upperNumber, 
+        mileage_kmpl: Number(mileage), 
+        note 
+      });
+      onClose();
+    } catch (err) {
+      setError('Something went wrong. Please try again.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -143,14 +210,26 @@ function VehicleFormModal({ vehicle, onClose, onSubmit }: { vehicle?: Vehicle, o
           <p className="text-xs opacity-60">Fleet details for mileage tracking</p>
         </div>
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
+          {error && (
+            <div className="rounded-xl bg-red-50 p-4 text-xs font-bold text-red-600 border border-red-100 flex items-center gap-2">
+              <AlertTriangle size={16} />
+              {error}
+            </div>
+          )}
           <div className="space-y-1">
             <label className="text-xs font-bold uppercase text-zinc-500">Vehicle Number</label>
             <input 
               autoFocus
               type="text" 
               value={number} 
-              onChange={e => setNumber(e.target.value)}
-              className="w-full rounded-xl border border-zinc-200 bg-zinc-50 p-4 font-bold text-lg focus:border-orange-500 focus:ring-0"
+              onChange={e => {
+                setNumber(e.target.value);
+                setError(null);
+              }}
+              className={cn(
+                "w-full rounded-xl border p-4 font-bold text-lg focus:ring-0 transition-all",
+                error ? "border-red-300 bg-red-50 focus:border-red-500" : "border-zinc-200 bg-zinc-50 focus:border-orange-500"
+              )}
               placeholder="e.g. MH12 AB 1234"
               required
             />
@@ -188,3 +267,4 @@ function VehicleFormModal({ vehicle, onClose, onSubmit }: { vehicle?: Vehicle, o
     </div>
   );
 }
+

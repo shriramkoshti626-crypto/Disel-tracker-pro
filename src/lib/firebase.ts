@@ -1,5 +1,12 @@
 import { initializeApp } from 'firebase/app';
-import { getAuth, GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
+import { 
+  getAuth, 
+  GoogleAuthProvider, 
+  signInWithPopup, 
+  RecaptchaVerifier, 
+  signInWithPhoneNumber,
+  ConfirmationResult
+} from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
 import firebaseConfig from '../../firebase-applet-config.json';
 
@@ -53,6 +60,19 @@ export async function signIn() {
     console.error('Auth Error:', error);
     throw error;
   }
+}
+
+export function setupRecaptcha(containerId: string) {
+  return new RecaptchaVerifier(auth, containerId, {
+    'size': 'invisible',
+    'callback': (response: any) => {
+      // reCAPTCHA solved, allow signInWithPhoneNumber.
+    }
+  });
+}
+
+export async function requestOTP(phoneNumber: string, verifier: RecaptchaVerifier): Promise<ConfirmationResult> {
+  return signInWithPhoneNumber(auth, phoneNumber, verifier);
 }
 
 export function signOut() {

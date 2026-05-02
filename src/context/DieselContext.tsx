@@ -31,6 +31,8 @@ interface DieselContextType {
   updateVehicle: (id: string, data: Partial<Vehicle>) => Promise<void>;
   deleteVehicle: (id: string) => Promise<void>;
   addTMLog: (data: Partial<TMLog>) => Promise<void>;
+  deleteEntry: (id: string) => Promise<void>;
+  deleteTMLog: (id: string) => Promise<void>;
   setOpeningBalance: (date: string, amount: number) => Promise<void>;
   refreshBalances: () => Promise<void>;
 }
@@ -217,6 +219,22 @@ export function DieselProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const deleteEntry = async (id: string) => {
+    try {
+      await deleteDoc(doc(db, 'inventory_entries', id));
+    } catch (err) {
+      handleFirestoreError(err, OperationType.DELETE, 'inventory_entries');
+    }
+  };
+
+  const deleteTMLog = async (id: string) => {
+    try {
+      await deleteDoc(doc(db, 'tm_logs', id));
+    } catch (err) {
+      handleFirestoreError(err, OperationType.DELETE, 'tm_logs');
+    }
+  };
+
   const setOpeningBalance = async (date: string, amount: number) => {
     if (!user) return;
     try {
@@ -244,7 +262,7 @@ export function DieselProvider({ children }: { children: React.ReactNode }) {
   return (
     <DieselContext.Provider value={{
       user, loading, entries, vehicles, tmLogs, dailyBalances, currentBalance,
-      addEntry, addVehicle, updateVehicle, deleteVehicle, addTMLog, setOpeningBalance, refreshBalances
+      addEntry, addVehicle, updateVehicle, deleteVehicle, addTMLog, deleteEntry, deleteTMLog, setOpeningBalance, refreshBalances
     }}>
       {children}
     </DieselContext.Provider>

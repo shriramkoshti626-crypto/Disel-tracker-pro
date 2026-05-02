@@ -1,12 +1,12 @@
 import React from 'react';
 import { useDiesel } from '../../context/DieselContext';
 import { format, subDays, isSameDay } from 'date-fns';
-import { History, Calendar, ArrowUpRight, ArrowDownRight, Package } from 'lucide-react';
+import { History, Calendar, ArrowUpRight, ArrowDownRight, Package, Trash2 } from 'lucide-react';
 import { cn, formatNumber } from '../../lib/utils';
 import { EntryType } from '../../types';
 
 export function InventoryView() {
-  const { entries, dailyBalances, tmLogs } = useDiesel();
+  const { entries, dailyBalances, tmLogs, deleteEntry, deleteTMLog } = useDiesel();
 
   // Generate last 7 days summary
   const last7Days = Array.from({ length: 7 }).map((_, i) => subDays(new Date(), i));
@@ -103,12 +103,12 @@ export function InventoryView() {
                 <th className="px-6 py-4">Type</th>
                 <th className="px-6 py-4">Liters</th>
                 <th className="px-6 py-4">Supplier/Vehicle</th>
-                <th className="px-6 py-4">Note</th>
+                <th className="px-6 py-4 text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-zinc-50">
               {[...entries, ...tmLogs.map(l => ({ ...l, type: 'tm_issue' as any }))].sort((a,b) => b.timestamp.toMillis() - a.timestamp.toMillis()).map((item, idx) => (
-                <tr key={idx} className="hover:bg-zinc-50/50 transition-colors">
+                <tr key={idx} className="group hover:bg-zinc-50/50 transition-colors">
                   <td className="px-6 py-4">
                     <p className="text-xs font-semibold">{format(item.timestamp.toDate(), 'MMM d')}</p>
                     <p className="text-[10px] text-zinc-400">{format(item.timestamp.toDate(), 'hh:mm a')}</p>
@@ -132,6 +132,22 @@ export function InventoryView() {
                   </td>
                   <td className="px-6 py-4">
                     <p className="text-xs text-zinc-400 max-w-[150px] truncate">{item.note || '-'}</p>
+                  </td>
+                  <td className="px-6 py-4 text-right">
+                    <button 
+                      onClick={() => {
+                        if (item.id && confirm('Delete this entry?')) {
+                          if (item.type === 'tm_issue') {
+                            deleteTMLog(item.id);
+                          } else {
+                            deleteEntry(item.id);
+                          }
+                        }
+                      }}
+                      className="md:opacity-0 md:group-hover:opacity-100 p-2 text-zinc-300 hover:text-red-500 transition-all"
+                    >
+                      <Trash2 size={16} />
+                    </button>
                   </td>
                 </tr>
               ))}

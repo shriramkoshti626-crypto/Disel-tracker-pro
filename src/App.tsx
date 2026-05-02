@@ -15,18 +15,21 @@ import {
   Settings, 
   LogOut, 
   User as UserIcon,
-  AlertTriangle
+  AlertTriangle,
+  Phone
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Dashboard } from './components/dashboard/Dashboard';
 import { InventoryView } from './components/inventory/InventoryView';
 import { VehicleList } from './components/vehicles/VehicleList';
 import { ReportsView } from './components/reports/ReportsView';
+import { PhoneLogin } from './components/auth/PhoneLogin';
 import { cn } from './lib/utils';
 
 function AppContent() {
   const { user, loading, dailyBalances } = useDiesel();
   const [activeTab, setActiveTab] = useState<'dashboard' | 'inventory' | 'vehicles' | 'reports'>('dashboard');
+  const [loginMethod, setLoginMethod] = useState<'selection' | 'google' | 'phone'>('selection');
 
   if (loading) {
     return (
@@ -45,18 +48,47 @@ function AppContent() {
   if (!user) {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center bg-zinc-950 px-6 text-white text-center">
-        <div className="mb-8 rounded-2xl bg-zinc-900 p-6 shadow-2xl">
-          <Fuel size={64} className="mx-auto mb-4 text-orange-500" />
-          <h1 className="text-3xl font-bold tracking-tight">DieselTrack Pro</h1>
-          <p className="mt-2 text-zinc-400">RMC Plant Diesel Management System</p>
-        </div>
-        <button
-          onClick={signIn}
-          className="flex w-full max-w-sm items-center justify-center gap-3 rounded-xl bg-orange-500 py-4 font-semibold text-white transition-all hover:bg-orange-600 active:scale-95"
-        >
-          <UserIcon size={20} />
-          Sign in with Google
-        </button>
+        {loginMethod === 'selection' ? (
+          <div className="w-full max-w-sm">
+            <motion.div 
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="mb-10 rounded-3xl bg-zinc-900 px-6 py-10 shadow-2xl border border-zinc-800"
+            >
+              <Fuel size={64} className="mx-auto mb-6 text-orange-500" />
+              <h1 className="text-3xl font-black tracking-tight">DieselTrack Pro</h1>
+              <p className="mt-3 text-sm text-zinc-400 leading-relaxed font-medium">Verify your identity to access the RMC Diesel Management System</p>
+            </motion.div>
+
+            <div className="space-y-4">
+              <button
+                onClick={() => {
+                  setLoginMethod('google');
+                  signIn().catch(() => setLoginMethod('selection'));
+                }}
+                className="flex w-full items-center justify-center gap-3 rounded-2xl bg-white py-4 font-bold text-zinc-950 transition-all hover:bg-zinc-100 active:scale-95 shadow-lg"
+              >
+                <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="" className="h-5 w-5" />
+                Sign in with Google
+              </button>
+
+              <button
+                onClick={() => setLoginMethod('phone')}
+                className="flex w-full items-center justify-center gap-3 rounded-2xl bg-zinc-800 py-4 font-bold text-white transition-all hover:bg-zinc-700 active:scale-95 border border-zinc-700 shadow-lg"
+              >
+                <Phone size={20} className="text-orange-500" />
+                Sign in with Phone (OTP)
+              </button>
+            </div>
+          </div>
+        ) : loginMethod === 'phone' ? (
+          <PhoneLogin onBack={() => setLoginMethod('selection')} />
+        ) : (
+          <div className="flex flex-col items-center gap-4">
+            <div className="h-10 w-10 animate-spin rounded-full border-4 border-orange-500 border-t-transparent" />
+            <p className="text-zinc-500 font-bold">Authenticating...</p>
+          </div>
+        )}
       </div>
     );
   }

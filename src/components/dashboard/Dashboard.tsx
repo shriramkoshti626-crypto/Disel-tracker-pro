@@ -176,6 +176,7 @@ export function Dashboard() {
           onClose={() => setShowIssue(false)} 
           onSubmit={addTMLog}
           vehicles={vehicles}
+          tmLogs={tmLogs}
         />
       )}
       {showSetOpening && (
@@ -275,37 +276,55 @@ function EntryModal({ type, onClose, onSubmit }: { type: EntryType, onClose: () 
   );
 }
 
-function IssueModal({ onClose, onSubmit, vehicles }: { onClose: () => void, onSubmit: (d: any) => Promise<void>, vehicles: any[] }) {
+function IssueModal({ onClose, onSubmit, vehicles, tmLogs }: { onClose: () => void, onSubmit: (d: any) => Promise<void>, vehicles: any[], tmLogs: any[] }) {
   const [vehicleId, setVehicleId] = useState('');
   const [liters, setLiters] = useState('');
   const [mileage, setMileage] = useState('');
   const [note, setNote] = useState('');
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const selectedVehicle = vehicles.find(v => v.id === vehicleId);
 
   React.useEffect(() => {
     if (selectedVehicle) {
       setMileage(selectedVehicle.mileage_kmpl.toString());
+      setError(null);
     }
   }, [selectedVehicle]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!vehicleId || !liters || !mileage) return;
+
+    // Duplicate check: within 5 minutes
+    const lastEntry = tmLogs.find(l => l.vehicleId === vehicleId);
+    if (lastEntry) {
+      const diffMinutes = (Date.now() - lastEntry.timestamp.toMillis()) / (1000 * 60);
+      if (diffMinutes < 5) {
+        setError(`Duplicate entry! This vehicle was issued diesel ${Math.round(diffMinutes)} mins ago.`);
+        return;
+      }
+    }
+
     setLoading(true);
     const lit = Number(liters);
     const mil = Number(mileage);
-    await onSubmit({
-      vehicleId,
-      vehicleNumber: selectedVehicle.vehicle_number,
-      liters_given: lit,
-      mileage_at_time: mil,
-      estimated_km: lit * mil,
-      note
-    });
-    setLoading(false);
-    onClose();
+    try {
+      await onSubmit({
+        vehicleId,
+        vehicleNumber: selectedVehicle.vehicle_number,
+        liters_given: lit,
+        mileage_at_time: mil,
+        estimated_km: lit * mil,
+        note
+      });
+      onClose();
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -320,11 +339,20 @@ function IssueModal({ onClose, onSubmit, vehicles }: { onClose: () => void, onSu
           <p className="text-xs opacity-80">Track vehicle-wise consumption</p>
         </div>
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
+          {error && (
+            <div className="flex items-center gap-2 rounded-xl bg-red-50 p-4 text-xs font-bold text-red-600 border border-red-100">
+              <AlertCircle size={16} />
+              {error}
+            </div>
+          )}
           <div className="space-y-1">
             <label className="text-xs font-bold uppercase text-zinc-500">Select Vehicle</label>
             <select 
               value={vehicleId} 
-              onChange={e => setVehicleId(e.target.value)}
+              onChange={e => {
+                setVehicleId(e.target.value);
+                setError(null);
+              }}
               className="w-full rounded-xl border border-zinc-200 bg-zinc-50 p-4 focus:border-orange-500 focus:ring-0"
               required
             >
@@ -380,7 +408,16 @@ function IssueModal({ onClose, onSubmit, vehicles }: { onClose: () => void, onSu
 
           <div className="flex gap-3 pt-4">
             <button type="button" onClick={onClose} className="flex-1 rounded-xl bg-zinc-100 py-4 font-bold text-zinc-500">Cancel</button>
-            <button disabled={loading} type="submit" className="flex-1 rounded-xl bg-orange-500 py-4 font-bold text-white shadow-lg shadow-orange-100">Confirm Issue</button>
+            <button 
+              disabled={loading || !!error} 
+              type="submit" 
+              className={cn(
+                "flex-1 rounded-xl py-4 font-bold text-white shadow-lg transition-all",
+                error ? "bg-zinc-200 cursor-not-allowed" : "bg-orange-500 hover:bg-orange-600 shadow-orange-100"
+              )}
+            >
+              {loading ? 'Confirming...' : 'Confirm Issue'}
+            </button>
           </div>
         </form>
       </motion.div>
