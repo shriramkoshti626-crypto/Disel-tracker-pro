@@ -1,0 +1,6 @@
+{
+  "name": "DieselTrack Pro",
+  "description": "Diesel inventory and consumption tracker for RMC plants with vehicle mileage estimation and reporting.",
+  "requestFramePermissions": [],
+  "majorCapabilities": []
+}

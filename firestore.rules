@@ -1,0 +1,98 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Default deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Helpers
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    // Global Timestamp Validation
+    function isNow(ts) {
+      return ts == request.time;
+    }
+
+    // --- Inventory Entries ---
+    match /inventory_entries/{entryId} {
+      allow read: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow create: if isSignedIn() 
+        && request.resource.data.userId == request.auth.uid
+        && isValidEntry(request.resource.data);
+      allow delete: if isSignedIn() && resource.data.userId == request.auth.uid;
+    }
+
+    function isValidEntry(data) {
+      return data.keys().hasAll(['type', 'liters', 'timestamp', 'userId'])
+        && data.keys().size() >= 4
+        && data.type in ['inward', 'consumption']
+        && data.liters is number
+        && data.liters > 0
+        && data.userId == request.auth.uid;
+    }
+
+    // --- Vehicles ---
+    match /vehicles/{vehicleId} {
+      allow read: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow create: if isSignedIn() 
+        && request.resource.data.userId == request.auth.uid
+        && isValidVehicle(request.resource.data);
+      allow update: if isSignedIn() 
+        && resource.data.userId == request.auth.uid
+        && request.resource.data.userId == request.auth.uid
+        && isValidVehicle(request.resource.data);
+      allow delete: if isSignedIn() && resource.data.userId == request.auth.uid;
+    }
+
+    function isValidVehicle(data) {
+      return data.keys().hasAll(['vehicle_number', 'mileage_kmpl', 'userId'])
+        && data.keys().size() >= 3
+        && data.vehicle_number is string && data.vehicle_number.size() > 0
+        && data.mileage_kmpl is number && data.mileage_kmpl > 0
+        && data.userId == request.auth.uid;
+    }
+
+    // --- TM Logs ---
+    match /tm_logs/{logId} {
+      allow read: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow create: if isSignedIn() 
+        && request.resource.data.userId == request.auth.uid
+        && isValidTMLog(request.resource.data);
+      allow delete: if isSignedIn() && resource.data.userId == request.auth.uid;
+    }
+
+    function isValidTMLog(data) {
+      return data.keys().hasAll(['vehicleId', 'liters_given', 'mileage_at_time', 'estimated_km', 'timestamp', 'userId'])
+        && data.keys().size() >= 6
+        && data.vehicleId is string
+        && data.liters_given is number && data.liters_given > 0
+        && data.userId == request.auth.uid;
+    }
+
+    // --- Daily Balances ---
+    match /daily_balances/{balanceId} {
+      allow read: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow write: if isSignedIn() 
+        && request.resource.data.userId == request.auth.uid
+        && isValidDailyBalance(request.resource.data);
+    }
+
+    function isValidDailyBalance(data) {
+      return data.keys().hasAll(['dateString', 'opening_balance', 'userId'])
+        && data.dateString is string
+        && data.opening_balance is number
+        && data.userId == request.auth.uid;
+    }
+  }
+}

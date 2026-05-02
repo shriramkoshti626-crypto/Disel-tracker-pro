@@ -1,0 +1,78 @@
+{
+  "entities": {
+    "Entry": {
+      "title": "Diesel Entry",
+      "description": "Inventory inward or manual consumption records",
+      "type": "object",
+      "properties": {
+        "type": { "type": "string", "enum": ["inward", "consumption"] },
+        "liters": { "type": "number" },
+        "supplier": { "type": "string" },
+        "note": { "type": "string" },
+        "timestamp": { "type": "string", "format": "date-time" },
+        "userId": { "type": "string" }
+      },
+      "required": ["type", "liters", "timestamp", "userId"]
+    },
+    "Vehicle": {
+      "title": "Transit Mixer Vehicle",
+      "description": "Master record for vehicles",
+      "type": "object",
+      "properties": {
+        "vehicle_number": { "type": "string" },
+        "mileage_kmpl": { "type": "number" },
+        "note": { "type": "string" },
+        "userId": { "type": "string" }
+      },
+      "required": ["vehicle_number", "mileage_kmpl", "userId"]
+    },
+    "TMLog": {
+      "title": "TM Diesel Issue Log",
+      "description": "Records of diesel issued to vehicles",
+      "type": "object",
+      "properties": {
+        "vehicleId": { "type": "string" },
+        "vehicleNumber": { "type": "string" },
+        "liters_given": { "type": "number" },
+        "mileage_at_time": { "type": "number" },
+        "estimated_km": { "type": "number" },
+        "note": { "type": "string" },
+        "timestamp": { "type": "string", "format": "date-time" },
+        "userId": { "type": "string" }
+      },
+      "required": ["vehicleId", "liters_given", "mileage_at_time", "estimated_km", "timestamp", "userId"]
+    },
+    "DailyBalance": {
+      "title": "Daily Inventory Balance",
+      "description": "Day-wise opening and closing balances",
+      "type": "object",
+      "properties": {
+        "dateString": { "type": "string", "description": "Format YYYY-MM-DD" },
+        "opening_balance": { "type": "number" },
+        "closing_balance": { "type": "number" },
+        "total_inward": { "type": "number" },
+        "total_consumption": { "type": "number" },
+        "userId": { "type": "string" }
+      },
+      "required": ["dateString", "opening_balance", "userId"]
+    }
+  },
+  "firestore": {
+    "/inventory_entries/{entryId}": {
+      "schema": "Entry",
+      "description": "Collection of inward and manual consumption records"
+    },
+    "/vehicles/{vehicleId}": {
+      "schema": "Vehicle",
+      "description": "Vehicle master records"
+    },
+    "/tm_logs/{logId}": {
+      "schema": "TMLog",
+      "description": "Logs of diesel issued to TM vehicles"
+    },
+    "/daily_balances/{balanceId}": {
+      "schema": "DailyBalance",
+      "description": "Day-wise inventory tracking"
+    }
+  }
+}
